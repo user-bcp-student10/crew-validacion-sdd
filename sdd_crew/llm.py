@@ -41,7 +41,8 @@ async def _copilot(prompt: str, model: str, timeout: float) -> str:
     async with copilot.CopilotClient(use_logged_in_user=sesion_cli) as cliente:
         async with await cliente.create_session(
             model=model,
-            reasoning_effort=os.getenv("COPILOT_REASONING_EFFORT", "high"),
+            # Vacío = no enviarlo (para modelos que no admiten esfuerzo de razonamiento).
+            reasoning_effort=os.getenv("COPILOT_REASONING_EFFORT", "high").strip() or None,
             available_tools=[], on_permission_request=negar,
             system_message={"mode": "replace", "content":
                             "Eres un validador. Sigue las instrucciones del historial y devuelve solo el informe "
