@@ -8,6 +8,7 @@ Uso:
     python validar.py --repo ../otra/ruta --reiniciar   # otra copia del repo, ignorando el checkpoint
     python validar.py --crear-issues                    # issues de GitHub con los hallazgos aprobados
     python validar.py --crear-issues --github-project 2 # ... y agregarlas al Project número 2
+    python validar.py --issues-auto --github-project 2  # validar y crear las issues al terminar, sin preguntar
 """
 from __future__ import annotations
 
@@ -124,6 +125,23 @@ def crear_issues(proyecto: Proyecto, salida: Path, severidades: list[str], githu
     return 0
 
 
+def issues_automaticas(proyecto: Proyecto, resumen: dict, args, gh: issues.Gh = issues.gh_real) -> None:
+    """Crea las issues al final del flujo, sin preguntas. No cambia el resultado de la validación."""
+    if args.solo_evidencia or resumen["modelo"] == "simulado":
+        print("Issues automáticas: no aplica sin revisión de un modelo.")
+        return
+    if resumen["detenido_en"]:
+        print("Issues automáticas: el flujo se detuvo por decisión humana; no se crea nada.")
+        return
+    severidades = [s.strip().upper() for s in args.severidades.split(",") if s.strip()]
+    print("\n" + "═" * 72)
+    print(f"Issues automáticas ({'/'.join(severidades)}, sin posibles duplicados):")
+    try:
+        crear_issues(proyecto, Path(args.salida), severidades, args.github_project, "", gh=gh)
+    except (FileNotFoundError, RuntimeError) as exc:
+        print(f"No se pudieron crear las issues: {exc}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Validación SDD con agentes por rol (CrewAI).")
     p.add_argument("--proyecto", default=str(RAIZ / "proyectos" / "wallet-onboarding.yaml"),
@@ -139,6 +157,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--severidades", default="ALTA,MEDIA", help="Severidades para --crear-issues (ALTA,MEDIA,BAJA)")
     p.add_argument("--github-project", type=int, help="Número del GitHub Project donde agregar las issues")
     p.add_argument("--seleccion", help="Selección sin preguntar para --crear-issues: todos, ninguno, 1,3 o 2-4")
+    p.add_argument("--issues-auto", action="store_true",
+                   help="Al terminar la validación, crear sin preguntar las issues de los hallazgos aprobados "
+                        "(excluye posibles duplicados)")
     args = p.parse_args(argv)
 
     try:
@@ -169,6 +190,8 @@ def main(argv: list[str] | None = None) -> int:
     print("\n" + "═" * 72)
     print(f"RESULTADO: {resumen['resultado']} — {resumen['motivo']}")
     print(f"Informes en {Path(args.salida).resolve()} (empieza por resumen.md)")
+    if args.issues_auto:
+        issues_automaticas(proyecto, resumen, args)
     if args.solo_evidencia:
         return 0 if resumen["evidencia_ok"] is not False else 1
     return 0 if resumen["resultado"] == "APROBADO" else 1

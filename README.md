@@ -124,6 +124,17 @@ Cada issue lleva:
 
 Las issues creadas quedan registradas en `output/issues_creadas.json`.
 
+### Automático
+
+```bash
+python validar.py --issues-auto --github-project 2           # tú apruebas cada informe; las issues se crean solas al final
+python validar.py --auto --issues-auto --github-project 2    # todo desatendido: informes aprobados sin revisar
+```
+
+Con `--issues-auto`, al terminar la validación se crean sin preguntar las issues de los hallazgos ALTA y MEDIA (cámbialo con `--severidades`). Quedan fuera los posibles duplicados. No se crea nada si el flujo se detuvo con `n` o si los informes son simulados.
+
+Con `--auto --issues-auto` nadie revisa los informes antes de crear las issues: úsalo solo si confías en el modelo, porque un hallazgo equivocado se convierte en una issue visible para todo el equipo.
+
 **Requisitos:** [GitHub CLI](https://cli.github.com) con sesión iniciada (`gh auth login`). Para `--github-project` necesitas además el permiso de Projects:
 
 ```bash

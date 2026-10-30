@@ -161,3 +161,23 @@ def test_repo_github_desde_el_remoto(tmp_path):
     subprocess.run(["git", "-C", str(tmp_path), "remote", "add", "origin", "https://github.com/ana/mi-repo.git"], check=True)
     assert issues.repo_github(tmp_path, None) == "ana/mi-repo"
     assert issues.repo_github(tmp_path, "x/y") == "x/y"
+
+
+def test_issues_auto_al_final_del_flujo_sin_preguntar(tmp_path, repo, monkeypatch):
+    import argparse
+    proyecto, salida = preparar(tmp_path, repo, {"security": INFORME_SEC})
+    monkeypatch.setattr("builtins.input", lambda *_: pytest.fail("no debe preguntar"))
+    gh = GhFalso()
+    args = argparse.Namespace(solo_evidencia=False, severidades="ALTA,MEDIA", github_project=None, salida=str(salida))
+    validar.issues_automaticas(proyecto, {"modelo": "copilot:x", "detenido_en": None}, args, gh=gh)
+    assert [a[a.index("--title") + 1][:9] for a in gh.de_tipo("issue", "create")] == ["[H-SEC-1]", "[H-SEC-2]"]
+
+
+def test_issues_auto_no_crea_si_el_flujo_se_detuvo_o_es_simulado(tmp_path, repo):
+    import argparse
+    proyecto, salida = preparar(tmp_path, repo, {"security": INFORME_SEC})
+    gh = GhFalso()
+    args = argparse.Namespace(solo_evidencia=False, severidades="ALTA", github_project=None, salida=str(salida))
+    validar.issues_automaticas(proyecto, {"modelo": "copilot:x", "detenido_en": "backend"}, args, gh=gh)
+    validar.issues_automaticas(proyecto, {"modelo": "simulado", "detenido_en": None}, args, gh=gh)
+    assert gh.llamadas == []
