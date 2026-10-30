@@ -95,3 +95,22 @@ def test_reglas_del_resultado_final():
     assert resultado_final(True, None, False)[0] == "NO CONCLUYENTE"
     assert resultado_final(True, "RECHAZADO", False)[0] == "RECHAZADO"
     assert resultado_final(None, "APROBADO", False)[0] == "NO CONCLUYENTE"
+
+
+def test_la_evidencia_corre_con_utf8_aunque_la_consola_sea_cp1252(tmp_path, repo, monkeypatch):
+    """En Windows la salida capturada usa cp1252: imprimir → fallaría sin forzar UTF-8."""
+    from sdd_crew import evidencia
+    monkeypatch.setenv("PYTHONIOENCODING", "cp1252")
+    proyecto = Proyecto.desde_yaml(escribir_proyecto(tmp_path, repo))
+    proyecto.evidencia = [{"nombre": "Unicode", "comando": ["python", "-c", "print('Trazabilidad spec → pruebas ✓')"]}]
+    [r] = evidencia.ejecutar(proyecto)
+    assert r.ok, r.salida
+    assert "→" in r.salida and "✓" in r.salida
+
+
+def test_una_verificacion_fallida_muestra_su_error_en_consola(tmp_path, repo):
+    mensajes = []
+    proyecto = Proyecto.desde_yaml(escribir_proyecto(tmp_path, repo, evidencia_ok=False))
+    ejecutar_flujo(proyecto, ROLES, runner_fijo()[0], aprobar_todo, tmp_path / "out", "x",
+                   solo_evidencia=True, log=mensajes.append)
+    assert any("salida real" in m for m in mensajes)

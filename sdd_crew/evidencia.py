@@ -1,6 +1,7 @@
 """Verificaciones deterministas: se ejecutan de verdad y su salida es la evidencia."""
 from __future__ import annotations
 
+import os
 import subprocess
 import time
 from dataclasses import asdict, dataclass
@@ -26,6 +27,12 @@ class Resultado:
         return {**asdict(self), "ok": self.ok}
 
 
+def entorno_utf8() -> dict[str, str]:
+    """Fuerza UTF-8 en los procesos hijos: en Windows, la salida capturada usaría cp1252 y
+    cualquier carácter como → o ✓ haría fallar el comando."""
+    return {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+
+
 def ejecutar(proyecto: Proyecto, timeout: int = 600) -> list[Resultado]:
     python = proyecto.python()
     resultados = []
@@ -35,7 +42,7 @@ def ejecutar(proyecto: Proyecto, timeout: int = 600) -> list[Resultado]:
         inicio = time.monotonic()
         try:
             r = subprocess.run(comando, cwd=proyecto.repo, capture_output=True, text=True,
-                               timeout=timeout, encoding="utf-8", errors="replace")
+                               timeout=timeout, encoding="utf-8", errors="replace", env=entorno_utf8())
             codigo, salida = r.returncode, (r.stdout + r.stderr)
         except FileNotFoundError as exc:
             codigo, salida = 127, f"No se pudo ejecutar: {exc}"

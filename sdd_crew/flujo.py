@@ -96,6 +96,11 @@ def ejecutar_flujo(proyecto: Proyecto, roles: tuple[Rol, ...], runner: Runner, a
                                            encoding="utf-8")
     for r in resultados:
         log(f"  {'✓' if r.ok else '✗'} {r.nombre} ({r.duracion_s} s)")
+        if not r.ok:
+            for linea in r.salida.splitlines()[-4:]:
+                log(f"      {linea}")
+    if evidencia_ok is False:
+        log(f"  Salida completa en {salida / 'evidencia.md'}")
 
     estado = EstadoFlujo.cargar(salida / ".checkpoint.json", commit, reiniciar, log)
     detenido_en = None
