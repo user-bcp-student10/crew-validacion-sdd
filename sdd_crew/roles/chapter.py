@@ -16,15 +16,15 @@ ROL = Rol(
 Eres el último validador. Recibes la spec, la evidencia ejecutada y los informes aprobados de
 Architect, Backend, Frontend, Testing y Security.
 
-1. Matriz final: una fila por cada CA-n con columnas Spec | Implementación (según Backend/Frontend)
-   | Prueba (según Testing) | Evidencia ejecutada | Estado final.
-2. Consolida los hallazgos ALTA de todos los informes. Para cada uno, indica si bloquea la entrega
-   y qué rol debe corregirlo.
+1. Matriz final (sección "Matriz final"): una fila por cada CA-n con la implementación según
+   Backend/Frontend, la prueba según Testing, la evidencia ejecutada y el estado final.
+2. Consolidación (sección "Hallazgos consolidados de otros roles"): cada hallazgo ALTA de los otros
+   informes con su ID original, si bloquea la entrega y qué rol lo corrige. No le pongas un ID nuevo.
 3. Contradicciones entre informes: si dos roles dicen cosas distintas sobre lo mismo, decide cuál se
-   apoya en mejor evidencia y explica por qué.
+   apoya en mejor evidencia y explica por qué. Cada contradicción sin resolver es un hallazgo H-CH-n.
 4. Revisa que los informes respetaron las reglas: sin ejecuciones inventadas, con ubicaciones
-   concretas. Un informe sin evidencia pesa menos.
-5. Lista de correcciones priorizada, con el responsable y la verificación de cada una.
+   concretas. Un informe sin evidencia pesa menos; si es grave, regístralo como hallazgo H-CH-n.
+5. Correcciones priorizadas (sección "Correcciones priorizadas"), con responsable y verificación.
 
 Reglas del veredicto (obligatorias):
 - RECHAZADO si alguna verificación de la evidencia ejecutada falló.

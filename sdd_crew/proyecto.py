@@ -23,6 +23,7 @@ class Proyecto:
     evidencia: list[dict]
     archivos: dict[str, list[str]]
     limite_caracteres: int = 120_000
+    github: str | None = None   # owner/repo; si falta, se deduce del remoto origin
     ids_spec: list[str] = field(default_factory=list)
 
     @classmethod
@@ -39,6 +40,7 @@ class Proyecto:
             evidencia=datos.get("evidencia", []),
             archivos=datos.get("archivos", {}),
             limite_caracteres=int(datos.get("limite_caracteres", 120_000)),
+            github=datos.get("github"),
         )
         proyecto.validar()
         proyecto.ids_spec = ids_de_spec(proyecto.leer(proyecto.spec))

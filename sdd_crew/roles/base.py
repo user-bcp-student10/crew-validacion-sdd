@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sdd_crew.formato import FORMATO_INFORME, LINEA_VEREDICTO_CHAPTER, LINEA_VEREDICTO_ROL
+from sdd_crew.formato import FORMATO_INFORME, LINEA_VEREDICTO_CHAPTER, LINEA_VEREDICTO_ROL, SECCIONES_CHAPTER
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,7 @@ def construir_prompt(rol: Rol, paquete: dict) -> str:
     formato = FORMATO_INFORME.format(
         nombre=rol.nombre, prefijo=rol.prefijo, foco=", ".join(foco) or "los IDs relevantes",
         linea_veredicto=LINEA_VEREDICTO_CHAPTER if rol.es_chapter else LINEA_VEREDICTO_ROL,
+        secciones_extra=SECCIONES_CHAPTER if rol.es_chapter else "",
     )
     partes = [
         f"# Tarea: validación SDD como {rol.nombre}",

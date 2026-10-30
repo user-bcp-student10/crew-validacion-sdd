@@ -1,6 +1,8 @@
 # Proyecto a validar. Las rutas son relativas a `repo`.
 nombre: Wallet Perú · Registro y activación
 repo: ../wallet-onboarding-mvp
+# Repo de GitHub donde se crean las issues de hallazgos (python validar.py --crear-issues).
+github: user-bcp-student10/wallet-onboarding-mvp
 
 spec: specs/001-registro-activacion/spec.md
 plan: specs/001-registro-activacion/plan.md

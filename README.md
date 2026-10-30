@@ -95,6 +95,42 @@ El código de salida es 0 solo si el resultado es APROBADO (o, con `--solo-evide
 | `<rol>_review.md` | Informe aprobado de cada rol |
 | `borradores/` | Último informe generado por cada rol, aprobado o no |
 | `.checkpoint.json` | Informes aprobados y commit validado |
+| `issues_creadas.json` | Issues creadas con `--crear-issues` |
+
+## Crear issues con los hallazgos
+
+Cierra el ciclo SDD: hallazgo → issue → corrección → nueva validación.
+
+```bash
+python validar.py --crear-issues                       # ALTA y MEDIA de los informes aprobados
+python validar.py --crear-issues --github-project 2    # ... y agregarlas al Project número 2
+python validar.py --crear-issues --severidades ALTA    # solo las ALTA
+```
+
+1. Lee **solo los informes que aprobaste** (los del checkpoint en `output/`). No ejecuta agentes.
+2. Muestra la lista numerada de hallazgos y te deja elegir: `Enter` (por defecto), `todos`, `ninguno`, `1,3` o `2-4`.
+3. Pide una confirmación final antes de crear nada.
+4. Crea una issue por hallazgo en el repo del campo `github:` del YAML, o en el remoto `origin` del repo validado.
+
+Cada issue lleva:
+- el título `[H-SEC-1] RS-6 · descripción`;
+- una tabla con rol, severidad, ID de la spec, `archivo:línea` y commit validado;
+- la evidencia, la corrección propuesta, cómo verificarla y un checklist para cerrarla;
+- las etiquetas `hallazgo`, `sdd:<rol>` y `severidad:<alta|media|baja>`, que se crean si no existen.
+
+**Sin duplicados:**
+- Si vuelves a ejecutar el comando con los mismos informes, no se crea nada nuevo: cada issue guarda una marca oculta con el commit y el ID del hallazgo.
+- Si una issue abierta ya cubre el mismo ID de spec y el mismo archivo, el hallazgo aparece como *posible duplicado* y queda fuera de la selección por defecto.
+
+Las issues creadas quedan registradas en `output/issues_creadas.json`.
+
+**Requisitos:** [GitHub CLI](https://cli.github.com) con sesión iniciada (`gh auth login`). Para `--github-project` necesitas además el permiso de Projects:
+
+```bash
+gh auth refresh -s project
+```
+
+Si ese permiso falta, la issue se crea igual y se te avisa para que la agregues al Project a mano. No se necesita MCP.
 
 ## Validar otro proyecto
 
@@ -122,6 +158,7 @@ sdd_crew/
   evidencia.py             Ejecución real de las verificaciones
   proyecto.py              Carga de spec, plan, contrato y archivos con número de línea
   ejecutor.py              Mini-Crew de CrewAI por rol (o informe simulado)
+  issues.py                Hallazgos aprobados → issues de GitHub con gh
   llm.py                   Copilot, CrewAI o simulado
 tests/                     Pruebas del flujo sin llamar a ningún modelo
 ```

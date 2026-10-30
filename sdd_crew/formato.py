@@ -25,15 +25,17 @@ Tabla con una fila por cada ID que te corresponde revisar ({foco}):
 
 ## 3. Hallazgos
 Tabla con una fila por hallazgo (si no hay, escribe "Sin hallazgos" y explica por qué):
-| ID | Severidad | Spec | Ubicación | Evidencia | Corrección propuesta | Cómo verificar la corrección |
-- ID: H-{prefijo}-1, H-{prefijo}-2, ...
+| ID | Severidad | Spec | Hallazgo | Ubicación | Evidencia | Corrección propuesta | Cómo verificar la corrección |
+- ID: H-{prefijo}-1, H-{prefijo}-2, ... Usa este prefijo solo en esta tabla.
 - Severidad: ALTA (incumple un CA o un RS, o es un riesgo de seguridad), MEDIA (cumple a medias o es frágil), BAJA (mejora).
 - Spec: el ID de la spec afectado (CA-n, RN-n, RS-n, RNF-n) o "—" si es una mejora general.
+- Hallazgo: una frase de máximo 12 palabras que describa el problema (se usa como título de la issue).
+- No uses el carácter | dentro de las celdas.
 - Ubicación: `archivo:línea` exacto del material entregado.
 - Evidencia: cita textual breve del código o de la salida que lo demuestra.
 - Cómo verificar: la prueba o el comando concreto que demostraría que la corrección funciona.
 
-## 4. Límites de esta revisión
+{secciones_extra}## 4. Límites de esta revisión
 Lo que no pudiste comprobar con el material entregado.
 
 {linea_veredicto}
@@ -49,6 +51,20 @@ Lo que no pudiste comprobar con el material entregado.
 LINEA_VEREDICTO_ROL = "Termina con una última línea exacta: `VEREDICTO: CUMPLE` o `VEREDICTO: NO CUMPLE` (NO CUMPLE si hay al menos un hallazgo ALTA)."
 LINEA_VEREDICTO_CHAPTER = "Termina con una última línea exacta: `VEREDICTO: APROBADO` o `VEREDICTO: RECHAZADO`."
 
+SECCIONES_CHAPTER = """\
+## Matriz final
+| CA | Implementación | Prueba | Evidencia ejecutada | Estado final |
+
+## Hallazgos consolidados de otros roles
+Tabla | ID original | Rol | Severidad | ¿Bloquea? | Responsable |. Usa los IDs originales (por ejemplo H-BE-2)
+y NO los repitas en la sección 3: allí van solo los hallazgos propios del Chapter (contradicciones entre
+informes, evidencia faltante, criterios sin cubrir).
+
+## Correcciones priorizadas
+Lista numerada: corrección, responsable y cómo verificarla.
+
+"""
+
 VEREDICTO_RE = re.compile(r"VEREDICTO:\s*\**\s*(APROBADO|RECHAZADO|NO CUMPLE|CUMPLE)\b", re.IGNORECASE)
 HALLAZGO_RE = re.compile(r"^\|\s*H-[A-Z]+-\d+\s*\|\s*\**(ALTA|MEDIA|BAJA)\**\s*\|", re.IGNORECASE | re.MULTILINE)
 
@@ -59,6 +75,12 @@ def veredicto(texto: str) -> str | None:
     return encontrados[-1].upper() if encontrados else None
 
 
+def seccion_hallazgos(texto: str) -> str:
+    """Solo la sección "## 3. Hallazgos": evita contar tablas que citan IDs de otros roles."""
+    m = re.search(r"^##\s*3\.\s*Hallazgos.*?$(.*?)(?=^##\s|\Z)", texto or "", re.MULTILINE | re.DOTALL)
+    return m.group(1) if m else (texto or "")
+
+
 def hallazgos_por_severidad(texto: str) -> dict[str, int]:
-    conteo = Counter(s.upper() for s in HALLAZGO_RE.findall(texto or ""))
+    conteo = Counter(s.upper() for s in HALLAZGO_RE.findall(seccion_hallazgos(texto)))
     return {s: conteo.get(s, 0) for s in SEVERIDADES}

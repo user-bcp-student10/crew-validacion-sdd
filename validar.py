@@ -6,10 +6,13 @@ Uso:
     python validar.py --roles architect,testing         # solo algunos roles
     python validar.py --auto                            # aprueba cada informe sin preguntar
     python validar.py --repo ../otra/ruta --reiniciar   # otra copia del repo, ignorando el checkpoint
+    python validar.py --crear-issues                    # issues de GitHub con los hallazgos aprobados
+    python validar.py --crear-issues --github-project 2 # ... y agregarlas al Project número 2
 """
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -18,7 +21,7 @@ from dotenv import load_dotenv
 RAIZ = Path(__file__).resolve().parent
 load_dotenv(RAIZ / ".env")
 
-from sdd_crew import ejecutor, formato, llm  # noqa: E402
+from sdd_crew import ejecutor, formato, issues, llm  # noqa: E402
 from sdd_crew.flujo import ejecutar_flujo  # noqa: E402
 from sdd_crew.proyecto import Proyecto  # noqa: E402
 from sdd_crew.roles import POR_CLAVE, ROLES  # noqa: E402
@@ -62,6 +65,65 @@ def aprobar_en_consola(rol: Rol, informe: str, borrador: Path) -> tuple[str, str
             print("Escribe el feedback para reintentar.")
 
 
+def crear_issues(proyecto: Proyecto, salida: Path, severidades: list[str], github_project: int | None,
+                 seleccion: str | None, gh: issues.Gh = issues.gh_real, entrada=input) -> int:
+    """Hallazgos aprobados → selección humana → issues en GitHub."""
+    commit, hallazgos = issues.desde_checkpoint(salida)
+    hallazgos = [h for h in hallazgos if h.severidad in severidades]
+    if commit and proyecto.commit() and commit != proyecto.commit():
+        print(f"⚠ Los informes son del commit {commit[:8]} y el repo está en {proyecto.commit()[:8]}. "
+              "Algunas ubicaciones pueden haber cambiado.")
+    if not hallazgos:
+        print(f"No hay hallazgos {'/'.join(severidades)} en los informes aprobados. No se crea nada.")
+        return 0
+
+    repo = issues.repo_github(proyecto.repo, proyecto.github)
+    gh("auth status".split())
+    hallazgos = issues.marcar_existentes(hallazgos, repo, commit, gh)
+    if not hallazgos:
+        print("Todos los hallazgos ya tienen issue. No se crea nada.")
+        return 0
+
+    print(f"\nHallazgos aprobados ({'/'.join(severidades)}) para crear en {repo}:\n")
+    for n, h in enumerate(hallazgos, start=1):
+        aviso = f"  ⚠ posible duplicado de {h.duplicado_de}" if h.duplicado_de else ""
+        print(f"  {n:>2}. [{h.severidad}] {h.titulo_issue()}{aviso}")
+        print(f"      {h.ubicacion}")
+    por_defecto = [n for n, h in enumerate(hallazgos, start=1) if not h.duplicado_de]
+    destino = f" y al Project {github_project}" if github_project else ""
+    print(f"\nPor defecto: {', '.join(map(str, por_defecto)) or 'ninguno'} (los posibles duplicados quedan fuera).")
+    while True:
+        texto = seleccion if seleccion is not None else entrada(
+            "¿Cuáles creo? [Enter] por defecto · todos · ninguno · 1,3 · 2-4: ")
+        try:
+            elegidos = issues.parsear_seleccion(texto, len(hallazgos), por_defecto)
+            break
+        except ValueError as exc:
+            if seleccion is not None:
+                raise SystemExit(f"Selección inválida: {exc}")
+            print(exc)
+    if not elegidos:
+        print("No se crea ninguna issue.")
+        return 0
+    if seleccion is None:
+        confirmar = entrada(f"Se crearán {len(elegidos)} issues en {repo}{destino}. ¿Confirmas? [s/n]: ").strip().lower()
+        if confirmar != "s":
+            print("Cancelado. No se creó nada.")
+            return 0
+
+    creadas = issues.crear([hallazgos[n - 1] for n in elegidos], repo, commit, gh, github_project)
+    registro = salida / "issues_creadas.json"
+    anteriores = json.loads(registro.read_text(encoding="utf-8")) if registro.exists() else []
+    registro.write_text(json.dumps(anteriores + creadas, ensure_ascii=False, indent=2), encoding="utf-8")
+    for c in creadas:
+        print(f"  ✓ {c['id']} → {c['url']}{' (en el Project)' if c['en_project'] else ''}")
+        if c.get("error_project"):
+            print(f"    ⚠ No se pudo agregar al Project: {c['error_project']}")
+            print("      Ejecuta `gh auth refresh -s project` y agrégala desde el Project.")
+    print(f"Registro en {registro}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Validación SDD con agentes por rol (CrewAI).")
     p.add_argument("--proyecto", default=str(RAIZ / "proyectos" / "wallet-onboarding.yaml"),
@@ -72,6 +134,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--auto", action="store_true", help="Aprobar cada informe sin preguntar")
     p.add_argument("--reiniciar", action="store_true", help="Ignorar el checkpoint")
     p.add_argument("--solo-evidencia", action="store_true", help="Solo verificaciones deterministas, sin agentes")
+    p.add_argument("--crear-issues", action="store_true",
+                   help="Crear issues de GitHub con los hallazgos de los informes aprobados (no ejecuta agentes)")
+    p.add_argument("--severidades", default="ALTA,MEDIA", help="Severidades para --crear-issues (ALTA,MEDIA,BAJA)")
+    p.add_argument("--github-project", type=int, help="Número del GitHub Project donde agregar las issues")
+    p.add_argument("--seleccion", help="Selección sin preguntar para --crear-issues: todos, ninguno, 1,3 o 2-4")
     args = p.parse_args(argv)
 
     try:
@@ -81,6 +148,14 @@ def main(argv: list[str] | None = None) -> int:
     except (FileNotFoundError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
+
+    if args.crear_issues:
+        severidades = [s.strip().upper() for s in args.severidades.split(",") if s.strip()]
+        try:
+            return crear_issues(proyecto, Path(args.salida), severidades, args.github_project, args.seleccion)
+        except (FileNotFoundError, RuntimeError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
 
     print(f"Validación SDD · {proyecto.nombre}")
     print(f"Repo: {proyecto.repo} · Spec: {proyecto.spec} · {len(proyecto.ids_spec)} IDs")

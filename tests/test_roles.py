@@ -55,3 +55,11 @@ VEREDICTO: **NO CUMPLE**
     assert hallazgos_por_severidad(informe) == {"ALTA": 1, "MEDIA": 1, "BAJA": 1}
     assert veredicto("sin línea") is None
     assert veredicto("VEREDICTO: CUMPLE\n...\nVEREDICTO: APROBADO") == "APROBADO"
+
+
+def test_el_formato_pide_titulo_de_hallazgo_y_el_chapter_consolida_aparte():
+    be = construir_prompt(POR_CLAVE["backend"], PAQUETE)
+    assert "| ID | Severidad | Spec | Hallazgo | Ubicación |" in be
+    assert "Hallazgos consolidados" not in be
+    ch = construir_prompt(POR_CLAVE["chapter"], PAQUETE)
+    assert "## Hallazgos consolidados de otros roles" in ch and "## Matriz final" in ch
